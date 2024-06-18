@@ -62,6 +62,9 @@ protected:
 
     void autoConnectPorts();
 
+    bool useJackTime_;
+    std::chrono::time_point<std::chrono::steady_clock> getJackCycleTime();
+
     std::string serverName_;
 
     jack_client_t* client_;
