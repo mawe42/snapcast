@@ -277,6 +277,8 @@ jack:///?name=<name>[sampleformat=48000:16:2][autoconnect=][autoconnect_skip=0][
 - `idle_threshold`: switch stream state from playing to idle after receiving `idle_threshold` milliseconds of silence
 - `silence_threshold_percent`: percent (float) of the max amplitude to be considered as silence
 - `send_silence`: forward silence to clients when stream state is `idle`
+- `jack_time`: use Jack server time for stream timestamps. Usage of this option requires that
+  Jack uses the same clock source as SnapCast, i.e. CLOCK_MONOTONIC.
 
 #### Description of Jack stream
 
