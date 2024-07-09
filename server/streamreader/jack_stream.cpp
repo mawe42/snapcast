@@ -138,6 +138,8 @@ JackStream::JackStream(PcmStream::Listener* pcmListener, boost::asio::io_context
     send_silence_ = (uri_.getQuery("send_silence", "false") == "true");
     idle_threshold_ = std::chrono::milliseconds(std::max(cpt::stoi(uri_.getQuery("idle_threshold", "100")), 10));
 
+    useJackTime_ = (uri.getQuery("jack_time", "false") == "true");
+
     doAutoConnect_ = (uri_.query.find("autoconnect") != uri_.query.end());
     autoConnectRegex_ = uri_.getQuery("autoconnect", "");
     autoConnectSkip_ = cpt::stoi(uri_.getQuery("autoconnect_skip", "0"));
@@ -287,6 +289,22 @@ bool JackStream::createJackPorts()
     return true;
 }
 
+std::chrono::time_point<std::chrono::steady_clock> JackStream::getJackCycleTime()
+{
+    jack_nframes_t current_frames;
+    jack_time_t current_usecs;
+    jack_time_t next_usecs;
+    float period_usecs;
+
+    int err = jack_get_cycle_times(client_, &current_frames, &current_usecs, &next_usecs, &period_usecs);
+    if (err)
+    {
+        throw SnapException("Unable to get Jack cycle times: " + cpt::to_string(err));
+    }
+
+    return std::chrono::time_point<std::chrono::steady_clock>(static_cast<chrono::microseconds>(current_usecs));
+}
+
 /**
  * Reads the Jack port buffers, interlaces and converts the samples
  * to the stream format and adds the resulting data to the
@@ -345,7 +363,14 @@ int JackStream::readJackBuffers(jack_nframes_t nframes)
         if (first_)
         {
             first_ = false;
-            tvEncodedChunk_ = std::chrono::steady_clock::now() - chunk_->duration<chrono::nanoseconds>();
+            if (useJackTime_)
+            {
+                tvEncodedChunk_ = getJackCycleTime();
+            }
+            else
+            {
+                tvEncodedChunk_ = std::chrono::steady_clock::now() - chunk_->duration<chrono::nanoseconds>();
+            }
         }
     }
 
