@@ -61,6 +61,8 @@ protected:
     void onJackShutdown();
 
     void autoConnectPorts();
+    void autoConnectGlobalPorts();
+    void autoConnectIndividualPorts();
 
     std::string serverName_;
 
@@ -69,7 +71,9 @@ protected:
     SampleFormat jackSampleFormat_;
 
     std::string autoConnectRegex_;
-    bool doAutoConnect_ = false;
+    std::map<int, std::string> autoConnectPortRegex_;
+    bool doGlobalAutoConnect_ = false;
+    bool doIndividualAutoConnect_ = false;
     int autoConnectSkip_;
 
     std::function<void(char*, jack_default_audio_sample_t*, unsigned long, unsigned long)> interleave_func_;

@@ -138,9 +138,19 @@ JackStream::JackStream(PcmStream::Listener* pcmListener, boost::asio::io_context
     send_silence_ = (uri_.getQuery("send_silence", "false") == "true");
     idle_threshold_ = std::chrono::milliseconds(std::max(cpt::stoi(uri_.getQuery("idle_threshold", "100")), 10));
 
-    doAutoConnect_ = (uri_.query.find("autoconnect") != uri_.query.end());
+    doGlobalAutoConnect_ = (uri_.query.find("autoconnect") != uri_.query.end());
     autoConnectRegex_ = uri_.getQuery("autoconnect", "");
     autoConnectSkip_ = cpt::stoi(uri_.getQuery("autoconnect_skip", "0"));
+
+    for (int i=1; i <= sampleFormat_.channels(); i++)
+    {
+        std::string key = static_cast<std::string>("autoconnect") + std::to_string(i);
+        auto iter = uri_.query.find(key);
+        if (iter != uri_.query.end()) {
+            autoConnectPortRegex_[i] = iter->second;
+            doIndividualAutoConnect_ = true;
+        }
+    }
 
     switch (sampleFormat_.bits())
     {
@@ -208,10 +218,7 @@ void JackStream::tryConnect()
             return;
         }
 
-        if (doAutoConnect_)
-        {
-            autoConnectPorts();
-        }
+        autoConnectPorts();
     }
     catch (exception& e)
     {
@@ -374,7 +381,7 @@ void JackStream::closeJackConnection()
 
 void JackStream::onJackPortRegistration(jack_port_id_t port_id, int registered)
 {
-    if (!doAutoConnect_ || !registered)
+    if ((!doGlobalAutoConnect_ && !doIndividualAutoConnect_) || !registered)
     {
         return;
     }
@@ -394,6 +401,19 @@ void JackStream::onJackPortRegistration(jack_port_id_t port_id, int registered)
 }
 
 void JackStream::autoConnectPorts()
+{
+    if (doGlobalAutoConnect_)
+    {
+        autoConnectGlobalPorts();
+    }
+
+    if (doIndividualAutoConnect_)
+    {
+        autoConnectIndividualPorts();
+    }
+}
+
+void JackStream::autoConnectGlobalPorts()
 {
     const char** portNames = jack_get_ports(client_, autoConnectRegex_.c_str(), nullptr, JackPortIsOutput);
 
@@ -428,6 +448,29 @@ void JackStream::autoConnectPorts()
     }
 
     jack_free(portNames);
+}
+
+void JackStream::autoConnectIndividualPorts()
+{
+    for (auto const& [channel, regex] : autoConnectPortRegex_)
+    {
+        const char** portNames = jack_get_ports(client_, regex.c_str(), nullptr, JackPortIsOutput);
+        if (portNames[0] != nullptr)
+        {
+            auto portIdx = channel - 1;
+            if (!jack_port_connected_to(ports_[portIdx], portNames[0]))
+            {
+
+                const char* localPortName = jack_port_name(ports_[portIdx]);
+                int err = jack_connect(client_, portNames[0], localPortName);
+                if (err != 0)
+                {
+                    LOG(ERROR, LOG_TAG) << "Unable to autoconnect " << localPortName << " to " << portNames[0] << "(Error: " << err << ")\n";
+                }
+            }
+        }
+        jack_free(portNames);
+    }
 }
 
 void JackStream::onJackShutdown()
