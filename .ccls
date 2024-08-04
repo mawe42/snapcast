@@ -1,0 +1,6 @@
+clang
+%h -x c++-header
+-Iserver
+-Iclient
+-Icommon
+-I.
