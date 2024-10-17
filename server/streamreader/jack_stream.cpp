@@ -277,7 +277,7 @@ bool JackStream::createJackPorts()
     for (int i = 0; i < channelCount; ++i)
     {
         std::string portName = "input_" + std::to_string(i);
-        jack_port_t* port = jack_port_register(client_, portName.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+        jack_port_t* port = jack_port_register(client_, portName.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput | JackPortIsTerminal, 0);
         if (port == nullptr)
         {
             LOG(ERROR, LOG_TAG) << name_ << ": failed to register port " << portName << "\n";
